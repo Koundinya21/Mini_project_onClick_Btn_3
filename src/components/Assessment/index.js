@@ -1,16 +1,17 @@
 import {Component} from 'react'
 
 import {Link} from 'react-router-dom'
+
 import './index.css'
 
 import Loader from 'react-loader-spinner'
 import Cookies from 'js-cookie'
+
+// import DetailsContext from '../../ReactContext'
 import Header from '../Header'
 
-// import Results from '../Results'
-// import ScoreContext from '../../ReactContext/index'
 import QuestionsBtn from '../QuestionsBtn'
-import Timer from '../Timer'
+// import Timer from '../Timer'
 
 import OptionsContent from '../Options'
 
@@ -21,6 +22,8 @@ const apiStatusConstants = {
   inProgress: 'IN_PROGRESS',
 }
 
+// const contextType = DetailsContext
+
 class Assessment extends Component {
   state = {
     questionsData: [],
@@ -28,12 +31,63 @@ class Assessment extends Component {
     currentQuestion: 0,
     selectedOptionId: '',
     score: 0,
+    timerMinutes: 10,
+    elapsedTimeInSeconds: 0,
+    isTimeRunning: false,
+
     // timerRunning: true,
   }
 
   componentDidMount() {
     this.requestingQuestions()
+    this.renderTimerComponent()
   }
+
+  componentWillUnmount() {
+    this.clearInterval()
+  }
+
+  clearInterval = () => this.clearInterval(this.timerId)
+
+  IncrementOfElapsedTime = () => {
+    const {elapsedTimeInSeconds, timerMinutes} = this.state
+    const timerCompleted = timerMinutes * 60 === elapsedTimeInSeconds
+
+    if (timerCompleted) {
+      this.clearInterval()
+      this.setState({
+        isTimeRunning: false,
+      })
+    } else {
+      this.setState(prev => ({
+        elapsedTimeInSeconds: prev.elapsedTimeInSeconds + 1,
+      }))
+    }
+  }
+
+  renderTimerComponent = () => {
+    this.timerId = setInterval(this.IncrementOfElapsedTime, 1000)
+  }
+
+  renderCompletedTime = () => {
+    const {elapsedTimeInSeconds, timerMinutes} = this.state
+    const timeRemaining = timerMinutes * 60 - elapsedTimeInSeconds
+
+    const Min = Math.floor(timeRemaining / 60)
+    const Sec = Math.floor(timeRemaining % 60)
+
+    const stringifiedMin = Min > 9 ? Min : `0${Min}`
+    const StringifiedSec = Sec > 9 ? Sec : `0${Sec}`
+
+    return `00:${stringifiedMin}:${StringifiedSec}`
+  }
+
+  renderTimer = () => (
+    <div className="timer-container">
+      <h1 className="heading">Time Left</h1>
+      <p className="time">{this.renderCompletedTime()}</p>
+    </div>
+  )
 
   setActiveOption = optionId => {
     this.setState({selectedOptionId: optionId})
@@ -100,7 +154,7 @@ class Assessment extends Component {
       />
       <h1 className="failure-heading">Oops! Something went wrong</h1>
       <p className="failure-para">We are having some trouble</p>
-      <Link to="/assess/questions">
+      <Link to="/assessment">
         <button type="button">Retry</button>
       </Link>
     </div>
@@ -134,7 +188,7 @@ class Assessment extends Component {
   increaseCount = () => {
     const {questionsData, currentQuestion} = this.state
 
-    if (currentQuestion + 1 < questionsData.length) {
+    if (currentQuestion < questionsData.length) {
       this.setState(prev => ({
         currentQuestion: prev.currentQuestion + 1,
         selectedOptionId: '',
@@ -142,7 +196,6 @@ class Assessment extends Component {
       this.checkTheAnswer()
     } else {
       console.log('Ended')
-      //   this.setState({TestEnd: true})
     }
   }
 
@@ -150,15 +203,23 @@ class Assessment extends Component {
     this.setState({selectedOptionId: optionId})
   }
 
-  //   ClickSubmitBtn = () => {
-  //     this.setState({TestEnd: true})
-  //   }
-
   ClickSubmitBtn = () => {
     const {history} = this.props
-    const {score} = this.state
+    const {score, isTimeRunning, elapsedTimeInSeconds} = this.state
+    // const {setElapsedTimeInSeconds} = contextType
+    // console.log(setElapsedTimeInSeconds)
+    // this.setState({
+    //   isTimeRunning: false,
+    // })
+    // setElapsedTimeInSeconds(elapsedTimeInSeconds)
 
-    history.replace('/results', {score})
+    // console.log(score)
+
+    history.replace('/results', {score, isTimeRunning, elapsedTimeInSeconds})
+  }
+
+  handleQuestionClick = questionIndex => {
+    this.setState({currentQuestion: questionIndex})
   }
 
   renderQuestions = () => {
@@ -172,63 +233,9 @@ class Assessment extends Component {
 
     console.log(NumberOfQuestions)
     console.log(score)
-
     return (
       <div className="Main-Background">
         <div>
-          {/* {!TestEnd ?
-            <div className="container">
-              <div className="questions-Container">
-                <div className="space-between-btn-questions">
-                  <h1 className="question">
-                    {currentQuestion + 1}.{displayingOneQuestion.questionsText}
-                  </h1>
-
-                  <hr className="line" />
-
-                  <OptionsContent
-                    optionType={displayingOneQuestion.optionsType}
-                    options={optionsValue}
-                    changeOption={this.changeOption}
-                    activeOption={selectedOptionId}
-                  />
-                </div>
-
-                {currentQuestion < 9 && (
-                  <div className="button-container">
-                    <button
-                      type="button"
-                      className="next-button"
-                      onClick={this.increaseCount}
-                    >
-                      Next Question
-                    </button>
-                  </div>
-                )}
-              </div>
-
-              <div>
-                <Timer />
-                <div className="questions-btn-space">
-                  <QuestionsBtn
-                    currentQuestion={currentQuestion}
-                    questionsData={questionsData}
-                  />
-                  <div className="btn-container">
-                    <button
-                      type="button"
-                      className="btn-submit"
-                      onClick={this.ClickSubmitBtn}
-                    >
-                      Submit Assessment
-                    </button>
-                  </div>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <Results score={score} />
-          )} */}
           <div className="container">
             <div className="questions-Container">
               <div className="space-between-btn-questions">
@@ -260,11 +267,13 @@ class Assessment extends Component {
             </div>
 
             <div>
-              <Timer />
+              {/* <Timer isTimerRunning={isTimerRunningBeforeSubmit} /> */}
+              {this.renderTimer()}
               <div className="questions-btn-space">
                 <QuestionsBtn
                   currentQuestion={currentQuestion}
                   questionsData={questionsData}
+                  handleQuestionClick={this.handleQuestionClick}
                 />
                 <div className="btn-container">
                   <button
@@ -281,6 +290,8 @@ class Assessment extends Component {
         </div>
       </div>
     )
+
+ 
   }
 
   renderTheQuestionsPart = () => {
@@ -308,3 +319,4 @@ class Assessment extends Component {
   }
 }
 export default Assessment
+
